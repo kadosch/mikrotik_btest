@@ -2,9 +2,8 @@
 #include <getopt.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include <arpa/inet.h>
 
-#include "tcptest.h"
+#include "direction.h"
 #include "parse_opt.h"
 
 void trunccopy(char *dst, int dstmaxlen, char *orig, int origlen){

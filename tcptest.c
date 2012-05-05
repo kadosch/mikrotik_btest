@@ -8,6 +8,7 @@
 #include <sys/time.h>
 
 #include "tcptest.h"
+#include "direction.h"
 #include "messages.h"
 #include "md5.h"
 

@@ -225,7 +225,7 @@ int tcptest(char *host, char *port, char *user, char *password, direction_t dire
 
 	pthread_mutex_lock(&mutexes[SEND]);
 	threads_arg[SEND].stop = 0;
-	pthread_mutex_lock(&mutexes[SEND]);
+	pthread_mutex_unlock(&mutexes[SEND]);
 
 	for (i=0; i< 2; ++i){
 		pthread_join(threads[i], NULL);

@@ -15,7 +15,7 @@
 struct thread_args {
 	int sockfd;
 	pthread_mutex_t *mutex;
-	int bytes;
+	unsigned long bytes;
 	double time;
 	int bufsize;
 	direction_t direction;
@@ -232,7 +232,7 @@ int tcptest(char *host, char *port, char *user, char *password, direction_t dire
 		pthread_join(threads[RECEIVE], NULL);
 		printf("Rx: %f mbps\n", threads_arg[RECEIVE].mbps);
 	}
-	else if (direction == SEND || direction == BOTH){
+	if (direction == SEND || direction == BOTH){
 		pthread_join(threads[SEND], NULL);
 		printf("Tx: %f mbps\n", threads_arg[SEND].mbps);
 	}

@@ -69,7 +69,7 @@ void *tcptest_thread(void *argument){
 		args->bytes += bytes;
 		args->mbps = ((args->bytes * 8) / 1048576) / args->time;
 	}
-	pthread_exit((void*) 0);
+	return NULL;
 }
 
 
@@ -122,7 +122,7 @@ void craft_response(char *user, char *password, unsigned char *challenge, unsign
 int tcptest(char *host, char *port, char *user, char *password, direction_t direction, int mtu, int time){
 	unsigned char buf[mtu], challenge[CHALLENGE_SIZE], response[RESPONSE_SIZE];
 	struct addrinfo hints, *servinfo, *p;
-	int rv, sockfd, numbytes, i;
+	int rv, sockfd, numbytes;
 	pthread_t threads[2];
 	thread_args_t threads_arg[2];
 	pthread_mutex_t mutexes[2];
@@ -227,12 +227,14 @@ int tcptest(char *host, char *port, char *user, char *password, direction_t dire
 	threads_arg[SEND].stop = 0;
 	pthread_mutex_unlock(&mutexes[SEND]);
 
-	for (i=0; i< 2; ++i){
-		pthread_join(threads[i], NULL);
-		if (i == RECEIVE)
-			printf("Rx: %f mbps", threads_arg[i].mbps);
-		else
-			printf("Tx: %f mbps", threads_arg[i].mbps);
+
+	if (direction == RECEIVE || direction == BOTH){
+		pthread_join(threads[RECEIVE], NULL);
+		printf("Rx: %f mbps\n", threads_arg[RECEIVE].mbps);
+	}
+	else if (direction == SEND || direction == BOTH){
+		pthread_join(threads[SEND], NULL);
+		printf("Tx: %f mbps\n", threads_arg[SEND].mbps);
 	}
 
 	pthread_mutex_destroy(&mutexes[RECEIVE]);

@@ -18,10 +18,10 @@ void trunccopy(char *dst, int dstmaxlen, char *orig, int origlen){
 
 void set_default_opt(program_options_t *options){
 	memset(options, 0, sizeof(*options));
-	options->time = 8.0;
-	options->mtu = 1500;
-	options->direction = RECEIVE;
-	strcpy(options->port, "2000");
+	options->time = DEFAULT_TIME;
+	options->mtu = DEFAULT_MTU;
+	options->direction = DEFAULT_DIRECTION;
+	strcpy(options->port, DEFAULT_PORT);
 }
 
 int parse_opt(int *argc, char **argv, program_options_t *options){

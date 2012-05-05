@@ -138,24 +138,23 @@ int tcptest(char *host, char *port, char *user, char *password, direction_t dire
 
 	for(p = servinfo; p != NULL; p = p->ai_next) {
 		if ((sockfd = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) == -1) {
-			perror("client: socket");
+			perror("socket");
 			continue;
 		}
 		if (connect(sockfd, p->ai_addr, p->ai_addrlen) == -1) {
 			close(sockfd);
-			perror("client: connect");
+			perror("connect");
 			continue;
 		}
 		break;
 	}
+	freeaddrinfo(servinfo);
 
 	if (p == NULL) {
 		fprintf(stderr, "client: failed to connect\n");
 		close(sockfd);
 		return 2;
 	}
-
-	freeaddrinfo(servinfo);
 
 	if (recv_msg(sockfd, buf, mtu, MSG_OK, &numbytes) != 0){
 		close(sockfd);

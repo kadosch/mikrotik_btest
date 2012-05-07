@@ -37,12 +37,15 @@ void init_thread_args(thread_args_t *args, int sockfd, pthread_mutex_t *mutex, i
 
 
 void *tcptest_thread(void *argument){
-	thread_args_t *args = (thread_args_t *) argument;
-	unsigned char buffer[args->bufsize];
+	thread_args_t *args;
+	unsigned char *buffer;
 	struct timeval t0 , t1;
 	double tv_sec , tv_usec ;
 	int bytes = 0;
 
+	args = (thread_args_t *) argument;
+
+	buffer = (unsigned char *) malloc(args->bufsize);
 	memset(buffer, 0, args->bufsize);
 
 	pthread_mutex_lock (args->mutex);
@@ -69,6 +72,7 @@ void *tcptest_thread(void *argument){
 		args->bytes += bytes;
 		args->mbps = ((args->bytes * 8) / 1048576) / args->time;
 	}
+	free(buffer);
 	return NULL;
 }
 
@@ -119,22 +123,17 @@ void craft_response(char *user, char *password, unsigned char *challenge, unsign
 	strncpy((char *) response+sizeof(lvl1_digest), user, RESPONSE_SIZE-sizeof(lvl1_digest));
 }
 
-int tcptest(char *host, char *port, char *user, char *password, direction_t direction, int mtu, int time){
-	unsigned char buf[mtu], challenge[CHALLENGE_SIZE], response[RESPONSE_SIZE];
+int open_socket(char *host, char *port){
 	struct addrinfo hints, *servinfo, *p;
-	int rv, sockfd, numbytes;
-	pthread_t threads[2];
-	thread_args_t threads_arg[2];
-	pthread_mutex_t mutexes[2];
-	pthread_attr_t attr;
+	int rv, sockfd;
 
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = AF_UNSPEC;
 	hints.ai_socktype = SOCK_STREAM;
 
 	if ((rv = getaddrinfo(host, port, &hints, &servinfo)) != 0) {
-		fprintf(stderr, "Invalid host: %s\n", gai_strerror(rv));
-		return 1;
+			fprintf(stderr, "Invalid host: %s\n", gai_strerror(rv));
+			return 1;
 	}
 
 	for(p = servinfo; p != NULL; p = p->ai_next) {
@@ -152,13 +151,22 @@ int tcptest(char *host, char *port, char *user, char *password, direction_t dire
 	freeaddrinfo(servinfo);
 
 	if (p == NULL) {
-		fprintf(stderr, "client: failed to connect\n");
+		fprintf(stderr, "failed to connect\n");
 		close(sockfd);
-		return 2;
+		return -1;
 	}
+	return sockfd;
+}
 
-	if (recv_msg(sockfd, buf, mtu, MSG_OK, &numbytes) != 0){
+int init_test(int sockfd, char *user, char *password,  direction_t direction, int mtu){
+	unsigned char *buffer, challenge[CHALLENGE_SIZE], response[RESPONSE_SIZE];
+	int numbytes, rv;
+
+	buffer = (unsigned char *) malloc(mtu);
+
+	if (recv_msg(sockfd, buffer, mtu, MSG_OK, &numbytes) != 0){
 		close(sockfd);
+		free(buffer);
 		return -1;
 	}
 
@@ -175,30 +183,53 @@ int tcptest(char *host, char *port, char *user, char *password, direction_t dire
 	}
 	if (rv != 0){
 		close(sockfd);
+		free(buffer);
 		return -1;
 	}
 
-	rv = recv_msg(sockfd, buf, mtu, MSG_OK, &numbytes);
+	rv = recv_msg(sockfd, buffer, mtu, MSG_OK, &numbytes);
 	if (rv != 0){
 		if (rv == 1){
-			if (numbytes == CHALLENGE_TOTAL_SIZE && memcmp(buf, CHALLENGE_HEADER, sizeof(CHALLENGE_HEADER)) == 0){
-				memcpy(challenge, buf+sizeof(CHALLENGE_HEADER), CHALLENGE_SIZE);
+			if (numbytes == CHALLENGE_TOTAL_SIZE && memcmp(buffer, CHALLENGE_HEADER, sizeof(CHALLENGE_HEADER)) == 0){
+				memcpy(challenge, buffer+sizeof(CHALLENGE_HEADER), CHALLENGE_SIZE);
 				craft_response(user, password, challenge, response);
 				if (send_msg(sockfd, response, sizeof(response)) != 0){
 					close(sockfd);
+					free(buffer);
 					return -1;
 				}
-				if (recv_msg(sockfd, buf, mtu, MSG_OK, &numbytes) != 0){
+				if (recv_msg(sockfd, buffer, mtu, MSG_OK, &numbytes) != 0){
 					fprintf(stderr, "Auth failed\n");
 					close(sockfd);
+					free(buffer);
 					return -1;
 				}
 			}
 		}
 		else{
 			close(sockfd);
+			free(buffer);
 			return -1;
 		}
+	}
+	free(buffer);
+	return 0;
+}
+
+int tcptest(char *host, char *port, char *user, char *password, direction_t direction, int mtu, int time){
+	int sockfd, elapsed_seconds = 0;
+	double mbps;
+	pthread_t threads[2];
+	thread_args_t threads_arg[2];
+	pthread_mutex_t mutexes[2];
+	pthread_attr_t attr;
+
+	if ((sockfd = open_socket(host, port)) == -1)
+		return -1;
+
+	if (init_test(sockfd, user, password, direction, mtu) == -1){
+		close(sockfd);
+		return -1;
 	}
 
 	pthread_attr_init(&attr);
@@ -217,7 +248,26 @@ int tcptest(char *host, char *port, char *user, char *password, direction_t dire
 		pthread_create(&threads[direction], NULL, tcptest_thread, (void *) &threads_arg[direction]);
 	}
 
-	sleep(time);
+	do{
+		sleep(1);
+		elapsed_seconds += 1;
+		if (direction == RECEIVE || direction == BOTH){
+			pthread_mutex_lock(&mutexes[RECEIVE]);
+			mbps = threads_arg[RECEIVE].mbps;
+			pthread_mutex_unlock(&mutexes[RECEIVE]);
+			printf("Rx: %7.2f Mb/s", mbps);
+		}
+		if (direction == BOTH)
+			printf("\t");
+		if (direction == SEND || direction == BOTH){
+			pthread_mutex_lock(&mutexes[SEND]);
+			mbps = threads_arg[SEND].mbps;
+			pthread_mutex_unlock(&mutexes[SEND]);
+			printf("Tx: %7.2f Mb/s", mbps);
+		}
+		printf("\r");
+		fflush(stdout);
+	}while (elapsed_seconds <= time);
 
 	pthread_mutex_lock(&mutexes[RECEIVE]);
 	threads_arg[RECEIVE].stop = 0;
@@ -227,15 +277,17 @@ int tcptest(char *host, char *port, char *user, char *password, direction_t dire
 	threads_arg[SEND].stop = 0;
 	pthread_mutex_unlock(&mutexes[SEND]);
 
-
 	if (direction == RECEIVE || direction == BOTH){
 		pthread_join(threads[RECEIVE], NULL);
-		printf("Rx: %f mbps\n", threads_arg[RECEIVE].mbps);
+		printf("Rx: %7.2f Mb/s", threads_arg[RECEIVE].mbps);
 	}
+	if (direction == BOTH)
+			printf("\t");
 	if (direction == SEND || direction == BOTH){
 		pthread_join(threads[SEND], NULL);
-		printf("Tx: %f mbps\n", threads_arg[SEND].mbps);
+		printf("Tx: %7.2f Mb/s", threads_arg[SEND].mbps);
 	}
+	printf("\n");
 
 	pthread_mutex_destroy(&mutexes[RECEIVE]);
 	pthread_mutex_destroy(&mutexes[SEND]);

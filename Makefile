@@ -1,6 +1,6 @@
 CC = gcc
 CFLAGS = -W -Wall
-LDFLAGS = -W -Wall
+LDFLAGS = $(CFLAGS)
 LDLIBS = -lpthread
 
 all: mikrotik_btest

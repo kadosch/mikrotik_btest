@@ -41,7 +41,7 @@ void *tcptest_thread(void *argument){
 	unsigned char *buffer;
 	struct timeval t0 , t1;
 	double tv_sec , tv_usec ;
-	int bytes = 0;
+	int bytes = 0, failed = 0;
 
 	args = (thread_args_t *) argument;
 
@@ -49,22 +49,27 @@ void *tcptest_thread(void *argument){
 	memset(buffer, 0, args->bufsize);
 
 	pthread_mutex_lock (args->mutex);
-	while (args->stop != 0){
+	while (args->stop != 0 && failed < MAX_RETRY){
 		pthread_mutex_unlock (args->mutex);
 		if (args->direction == RECEIVE){
 			gettimeofday(&t0 , NULL);
 			bytes = recv(args->sockfd, buffer, args->bufsize, 0);
 			gettimeofday(&t1 , NULL);
-			if (bytes == -1)
-				break;
 		}
 		else{
 			gettimeofday(&t0 , NULL);
 			bytes = send(args->sockfd, buffer, args->bufsize, 0);
 			gettimeofday(&t1 , NULL);
-			if (bytes == -1)
-				break;
+
 		}
+
+		if (bytes == -1){
+			bytes = 0;
+			++failed;
+		}
+		else
+			failed = 0;
+
 		tv_sec = (double) (t1.tv_sec - t0.tv_sec);
 		tv_usec = (double) (t1.tv_usec - t0.tv_usec);
 		pthread_mutex_lock (args->mutex);
@@ -89,12 +94,17 @@ int recv_msg(int sockfd, unsigned char *buf, int bufsize, unsigned char *msg, in
 }
 
 int send_msg(int sockfd, unsigned char *msg, int len){
-	int bytes_sent, bytes;
+	int bytes_sent = 0, failed = 0, bytes;
 	
-	bytes_sent = 0;
 	do{
 		if ((bytes = send(sockfd, msg, len, 0)) == -1){
-			perror("recv");
+			++failed;
+		}
+		else
+			failed = 0;
+
+		if (failed >= MAX_RETRY){
+			perror("send");
 			return -1;
 		}
 		bytes_sent += bytes;
@@ -188,32 +198,26 @@ int init_test(int sockfd, char *user, char *password,  direction_t direction, in
 	}
 
 	rv = recv_msg(sockfd, buffer, mtu, MSG_OK, &numbytes);
-	if (rv != 0){
-		if (rv == 1){
-			if (numbytes == CHALLENGE_TOTAL_SIZE && memcmp(buffer, CHALLENGE_HEADER, sizeof(CHALLENGE_HEADER)) == 0){
-				memcpy(challenge, buffer+sizeof(CHALLENGE_HEADER), CHALLENGE_SIZE);
-				craft_response(user, password, challenge, response);
-				if (send_msg(sockfd, response, sizeof(response)) != 0){
-					close(sockfd);
+	if (rv == 0){
+		free(buffer);
+		return 0;
+	}
+	else if (rv == 1){
+		if (numbytes == CHALLENGE_TOTAL_SIZE && memcmp(buffer, CHALLENGE_HEADER, sizeof(CHALLENGE_HEADER)) == 0){
+			memcpy(challenge, buffer+sizeof(CHALLENGE_HEADER), CHALLENGE_SIZE);
+			craft_response(user, password, challenge, response);
+			if (send_msg(sockfd, response, sizeof(response)) == 0){
+				if (recv_msg(sockfd, buffer, mtu, MSG_OK, &numbytes) == 0){
 					free(buffer);
-					return -1;
-				}
-				if (recv_msg(sockfd, buffer, mtu, MSG_OK, &numbytes) != 0){
-					fprintf(stderr, "Auth failed\n");
-					close(sockfd);
-					free(buffer);
-					return -1;
+					return 0;
 				}
 			}
 		}
-		else{
-			close(sockfd);
-			free(buffer);
-			return -1;
-		}
 	}
+	fprintf(stderr, "Auth failed\n");
+	close(sockfd);
 	free(buffer);
-	return 0;
+	return -1;
 }
 
 int tcptest(char *host, char *port, char *user, char *password, direction_t direction, int mtu, int time){

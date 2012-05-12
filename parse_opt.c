@@ -23,27 +23,37 @@ void set_default_opt(program_options_t *options){
 	strcpy(options->port, DEFAULT_PORT);
 }
 
+void print_help(){
+	printf("This is a bandwidth test client compatible with Mikrotik RouterOS.\n\n");
+	printf("Usage: mikrotik_btest [options] HOST[:PORT]\n\n");
+	printf("Options:\n");
+	printf("\t-h, --help \t\t\t\t show this help message and exit.\n");
+	printf("\t-t DURATION, --time=DURATION \t\t test duration in seconds. Default 8 seconds.\n");
+	printf("\t-m MTU, --mtu=MTU \t\t\t MTU in bytes for the test. Default 1500 bytes.\n");
+	printf("\t-d DIRECTION, --direction=DIRECTION \t Test direction (receive, send, both). Default receive.\n");
+	printf("\t-u USER, --user=USER\n");
+	printf("\t-p PASSWORD, --password=PASSWORD\n");
+}
+
 int parse_opt(int *argc, char **argv, program_options_t *options){
 	int c, optarglen, option_index;
+	char * pch;
 
 	static struct option long_options[] = {
-			{"port",     required_argument, 0, 'p'},
 	        {"time",  required_argument, 0, 't'},
 	        {"mtu",  required_argument, 0, 'm'},
 	        {"direction",  required_argument, 0, 'd'},
 	        {"user",    required_argument, 0, 'u'},
-	        {"password",    required_argument, 0, 'a'},
+	        {"password",    required_argument, 0, 'p'},
+	        {"help",   no_argument, 0, 'h'},
 	        {0, 0, 0, 0}};
 
 	set_default_opt(options);
 
-	while ((c = getopt_long(*argc, argv, "p:t:m:d:u:a:", long_options, &option_index)) != -1) {
+	while ((c = getopt_long(*argc, argv, "p:t:m:d:u:a:h", long_options, &option_index)) != -1) {
 		if (optarg)
 			optarglen = strlen(optarg);
 		switch(c){
-			case 'p':
-				trunccopy(options->port, sizeof(options->port), optarg, optarglen);
-				break;
 			case 't':
 				options->time = atoi(optarg);
 				break;
@@ -56,15 +66,26 @@ int parse_opt(int *argc, char **argv, program_options_t *options){
 			case 'u':
 				trunccopy(options->user, sizeof(options->user), optarg, optarglen);
 				break;
-			case 'a':
+			case 'p':
 				trunccopy(options->password, sizeof(options->password), optarg, optarglen);
+				break;
+			case 'h':
+				print_help();
+				return 1;
 				break;
 			default:
 				return -1;
 		}
 	}
-	if (*argc - optind == 1)
-		trunccopy(options->host, sizeof(options->host), argv[optind], strlen(argv[optind]));	
+	if (*argc - optind == 1){
+		if ((pch = strtok(argv[optind], ":")) != NULL){
+			trunccopy(options->host, sizeof(options->host), pch, strlen(pch));
+			if((pch = strtok(NULL, ":")) != NULL)
+				trunccopy(options->port, sizeof(options->port), pch, strlen(pch));
+		}
+		else
+			return -1;
+	}
 	else
 		return -1;
 	return 0;
@@ -107,3 +128,4 @@ int check_opt(program_options_t *options){
 	
 	return 0;
 }
+

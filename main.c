@@ -4,23 +4,24 @@
 
 #include "parse_opt.h"
 #include "tcptest.h"
+#include "return_codes.h"
 
 int main (int argc, char **argv) {
 	program_options_t options;
 	int rv;
 
 	rv = parse_opt(&argc, argv, &options);
-	if ( rv == -1){
+	if ( rv == RETURN_ERROR){
 		fprintf(stderr, "Error parsing commands\n");
-		exit(-1);
+		exit(EXIT_FAILURE);
 	}
-	else if (rv == 1)
-		exit(0);
+	else if (rv == RETURN_PRINT_HELP)
+		exit(EXIT_SUCCESS);
 
-	if (check_opt(&options) != 0)
-		exit(-1);
+	if (check_opt(&options) != RETURN_OK)
+		exit(EXIT_FAILURE);
 
 	tcptest(options.host, options.port, options.user, options.password, options.direction, options.mtu, options.time);
 	
-	exit(0);
+	exit(EXIT_SUCCESS);
 }

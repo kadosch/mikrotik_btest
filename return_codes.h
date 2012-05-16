@@ -1,0 +1,9 @@
+#ifndef RETURN_CODES_H
+#define RETURN_CODES_H
+
+#define RETURN_OK 0
+#define RETURN_ERROR -1
+#define RETURN_PRINT_HELP 2
+#define RETURN_MSG_MISMATCH 3
+
+#endif

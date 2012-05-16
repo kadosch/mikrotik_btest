@@ -4,6 +4,7 @@
 #include <stdio.h>
 
 #include "direction.h"
+#include "return_codes.h"
 #include "parse_opt.h"
 
 void trunccopy(char *dst, int dstmaxlen, char *orig, int origlen){
@@ -71,10 +72,10 @@ int parse_opt(int *argc, char **argv, program_options_t *options){
 				break;
 			case 'h':
 				print_help();
-				return 1;
+				return RETURN_PRINT_HELP;
 				break;
 			default:
-				return -1;
+				return RETURN_ERROR;
 		}
 	}
 	if (*argc - optind == 1){
@@ -84,11 +85,11 @@ int parse_opt(int *argc, char **argv, program_options_t *options){
 				trunccopy(options->port, sizeof(options->port), pch, strlen(pch));
 		}
 		else
-			return -1;
+			return RETURN_ERROR;
 	}
 	else
-		return -1;
-	return 0;
+		return RETURN_ERROR;
+	return RETURN_OK;
 }
 
 int check_opt(program_options_t *options){
@@ -97,7 +98,7 @@ int check_opt(program_options_t *options){
 	port = atoi(options->port);
 	if (port < 1 || port >= 65536){
 		fprintf(stderr, "Port %s is not valid\n", options->port);
-		return -1;
+		return RETURN_ERROR;
 	}
 
 	if (strlen(options->direction_string) > 0){
@@ -112,20 +113,24 @@ int check_opt(program_options_t *options){
 		}
 		else{
 			fprintf(stderr, "Direction %s is not valid\n", options->direction_string);
-			return -1;
+			return RETURN_ERROR;
 		}
 	}
 
 	if (options->mtu == 0){
 		fprintf(stderr, "MTU is not valid\n");
-		return -1;
+		return RETURN_ERROR;
+	}
+	else if(options->mtu > 9000){
+		fprintf(stderr, "MTU is too big\n");
+		return RETURN_ERROR;
 	}
 
 	if (options->time == 0.0){
 		fprintf(stderr, "Time is not valid\n");
-		return -1;
+		return RETURN_ERROR;
 	}
 	
-	return 0;
+	return RETURN_OK;
 }
 

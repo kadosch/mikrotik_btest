@@ -5,16 +5,19 @@ LDLIBS = -lpthread
 
 all: mikrotik_btest
 	
-mikrotik_btest: main.o parse_opt.o tcptest.o messages.o md5.o
+mikrotik_btest: main.o parse_opt.o tcptest_thread.o tcptest.o messages.o md5.o
 	$(CC) $(LDFLAGS) -o $@ $^ $(LDLIBS)
 
-main.o: main.c parse_opt.h tcptest.h
+main.o: main.c parse_opt.h tcptest.h return_codes.h
 	$(CC) $(CFLAGS) -c -o $@ $<
 
-parse_opt.o: parse_opt.c parse_opt.h direction.h
+parse_opt.o: parse_opt.c parse_opt.h direction.h return_codes.h
 	$(CC) $(CFLAGS) -c -o $@ $<
 
-tcptest.o: tcptest.c tcptest.h direction.h messages.h md5.h
+tcptest.o: tcptest.c tcptest.h tcptest_thread.h direction.h messages.h md5.h return_codes.h
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+tcptest_thread.o: tcptest_thread.c tcptest_thread.h direction.h
 	$(CC) $(CFLAGS) -c -o $@ $<
 
 messages.o: messages.c messages.h

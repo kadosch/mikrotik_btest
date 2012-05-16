@@ -5,92 +5,23 @@
 #include <unistd.h>
 #include <netdb.h>
 #include <sys/socket.h>
-#include <sys/time.h>
 
 #include "tcptest.h"
+#include "tcptest_thread.h"
 #include "direction.h"
 #include "messages.h"
 #include "md5.h"
-
-struct thread_args {
-	int sockfd;
-	pthread_mutex_t *mutex;
-	unsigned long bytes;
-	double time;
-	int bufsize;
-	direction_t direction;
-	int stop;
-	double mbps;
-};
-typedef struct thread_args thread_args_t;
-
-void init_thread_args(thread_args_t *args, int sockfd, pthread_mutex_t *mutex, int bufsize, direction_t direction){
-	args->sockfd = sockfd;
-	args->bufsize = bufsize;
-	args->direction = direction;
-	args->mutex = mutex;
-	args->bytes = 0;
-	args->time = 0.0;
-	args->stop = 1;
-	args->mbps = 0.0;
-}
-
-
-void *tcptest_thread(void *argument){
-	thread_args_t *args;
-	unsigned char *buffer;
-	struct timeval t0 , t1;
-	double tv_sec , tv_usec ;
-	int bytes = 0, failed = 0;
-
-	args = (thread_args_t *) argument;
-
-	buffer = (unsigned char *) malloc(args->bufsize);
-	memset(buffer, 0, args->bufsize);
-
-	pthread_mutex_lock (args->mutex);
-	while (args->stop != 0 && failed < MAX_RETRY){
-		pthread_mutex_unlock (args->mutex);
-		if (args->direction == RECEIVE){
-			gettimeofday(&t0 , NULL);
-			bytes = recv(args->sockfd, buffer, args->bufsize, 0);
-			gettimeofday(&t1 , NULL);
-		}
-		else{
-			gettimeofday(&t0 , NULL);
-			bytes = send(args->sockfd, buffer, args->bufsize, 0);
-			gettimeofday(&t1 , NULL);
-
-		}
-
-		if (bytes == -1){
-			bytes = 0;
-			++failed;
-		}
-		else
-			failed = 0;
-
-		tv_sec = (double) (t1.tv_sec - t0.tv_sec);
-		tv_usec = (double) (t1.tv_usec - t0.tv_usec);
-		pthread_mutex_lock (args->mutex);
-		args->time += tv_sec + tv_usec * 1.0e-6;
-		args->bytes += bytes;
-		args->mbps = ((args->bytes * 8) / 1048576) / args->time;
-	}
-	free(buffer);
-	return NULL;
-}
-
+#include "return_codes.h"
 
 int recv_msg(int sockfd, unsigned char *buf, int bufsize, unsigned char *msg, int *recvbytes){
 	if ((*recvbytes = recv(sockfd, buf, bufsize, 0)) == -1) {
 		perror("recv");
-		return -1;
+		return RETURN_ERROR;
 	}
 	if ((*recvbytes == sizeof(MSG_OK)) && (memcmp(buf, msg, *recvbytes) == 0)){
-		return 0;
+		return RETURN_OK;
 	}
-	return 1;
+	return RETURN_MSG_MISMATCH;
 }
 
 int send_msg(int sockfd, unsigned char *msg, int len){
@@ -105,11 +36,11 @@ int send_msg(int sockfd, unsigned char *msg, int len){
 
 		if (failed >= MAX_RETRY){
 			perror("send");
-			return -1;
+			return RETURN_ERROR;
 		}
 		bytes_sent += bytes;
 	}while(bytes_sent < len);
-	return 0;
+	return RETURN_OK;
 }
 
 void craft_response(char *user, char *password, unsigned char *challenge, unsigned char *response){
@@ -143,7 +74,7 @@ int open_socket(char *host, char *port){
 
 	if ((rv = getaddrinfo(host, port, &hints, &servinfo)) != 0) {
 			fprintf(stderr, "Invalid host: %s\n", gai_strerror(rv));
-			return 1;
+			return RETURN_ERROR;
 	}
 
 	for(p = servinfo; p != NULL; p = p->ai_next) {
@@ -163,7 +94,7 @@ int open_socket(char *host, char *port){
 	if (p == NULL) {
 		fprintf(stderr, "failed to connect\n");
 		close(sockfd);
-		return -1;
+		return RETURN_ERROR;
 	}
 	return sockfd;
 }
@@ -177,7 +108,7 @@ int init_test(int sockfd, char *user, char *password,  direction_t direction, in
 	if (recv_msg(sockfd, buffer, mtu, MSG_OK, &numbytes) != 0){
 		close(sockfd);
 		free(buffer);
-		return -1;
+		return RETURN_ERROR;
 	}
 
 	switch(direction){
@@ -194,22 +125,22 @@ int init_test(int sockfd, char *user, char *password,  direction_t direction, in
 	if (rv != 0){
 		close(sockfd);
 		free(buffer);
-		return -1;
+		return RETURN_ERROR;
 	}
 
 	rv = recv_msg(sockfd, buffer, mtu, MSG_OK, &numbytes);
-	if (rv == 0){
+	if (rv == RETURN_OK){
 		free(buffer);
-		return 0;
+		return RETURN_OK;
 	}
-	else if (rv == 1){
+	else if (rv == RETURN_MSG_MISMATCH){
 		if (numbytes == CHALLENGE_TOTAL_SIZE && memcmp(buffer, CHALLENGE_HEADER, sizeof(CHALLENGE_HEADER)) == 0){
 			memcpy(challenge, buffer+sizeof(CHALLENGE_HEADER), CHALLENGE_SIZE);
 			craft_response(user, password, challenge, response);
 			if (send_msg(sockfd, response, sizeof(response)) == 0){
 				if (recv_msg(sockfd, buffer, mtu, MSG_OK, &numbytes) == 0){
 					free(buffer);
-					return 0;
+					return RETURN_OK;
 				}
 			}
 		}
@@ -217,7 +148,7 @@ int init_test(int sockfd, char *user, char *password,  direction_t direction, in
 	fprintf(stderr, "Auth failed\n");
 	close(sockfd);
 	free(buffer);
-	return -1;
+	return RETURN_ERROR;
 }
 
 int tcptest(char *host, char *port, char *user, char *password, direction_t direction, int mtu, int time){
@@ -228,12 +159,12 @@ int tcptest(char *host, char *port, char *user, char *password, direction_t dire
 	pthread_mutex_t mutexes[2];
 	pthread_attr_t attr;
 
-	if ((sockfd = open_socket(host, port)) == -1)
-		return -1;
+	if ((sockfd = open_socket(host, port)) == RETURN_ERROR)
+		return RETURN_ERROR;
 
-	if (init_test(sockfd, user, password, direction, mtu) == -1){
+	if (init_test(sockfd, user, password, direction, mtu) == RETURN_ERROR){
 		close(sockfd);
-		return -1;
+		return RETURN_ERROR;
 	}
 
 	pthread_attr_init(&attr);
@@ -274,11 +205,11 @@ int tcptest(char *host, char *port, char *user, char *password, direction_t dire
 	}while (elapsed_seconds <= time);
 
 	pthread_mutex_lock(&mutexes[RECEIVE]);
-	threads_arg[RECEIVE].stop = 0;
+	threads_arg[RECEIVE].stop = TRUE;
 	pthread_mutex_unlock(&mutexes[RECEIVE]);
 
 	pthread_mutex_lock(&mutexes[SEND]);
-	threads_arg[SEND].stop = 0;
+	threads_arg[SEND].stop = TRUE;
 	pthread_mutex_unlock(&mutexes[SEND]);
 
 	if (direction == RECEIVE || direction == BOTH){
@@ -296,5 +227,5 @@ int tcptest(char *host, char *port, char *user, char *password, direction_t dire
 	pthread_mutex_destroy(&mutexes[RECEIVE]);
 	pthread_mutex_destroy(&mutexes[SEND]);
 	close(sockfd);
-	return 0;
+	return RETURN_OK;
 }

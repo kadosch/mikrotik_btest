@@ -9,3 +9,7 @@ Options:
 	-d DIRECTION, --direction=DIRECTION 	 Test direction (receive, send, both). Default receive.
 	-u USER, --user=USER
 	-p PASSWORD, --password=PASSWORD
+
+	
+This software is licensed under the terms of GPLv3 as defined by the
+Free Software Foundation, details can be read in the COPYING file.

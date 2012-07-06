@@ -144,6 +144,10 @@ int check_opt(program_options_t *options){
 		fprintf(stderr, "Time is not valid\n");
 		return RETURN_ERROR;
 	}
+	else if(options->time >= MAX_TIME){
+		fprintf(stderr, "Time has to be less than 60 seconds\n");
+		return RETURN_ERROR;
+	}
 	
 	return RETURN_OK;
 }

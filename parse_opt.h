@@ -36,6 +36,7 @@ int check_opt(program_options_t *options);
 
 #define DEFAULT_MTU 1500
 #define DEFAULT_TIME 8.0
+#define MAX_TIME 60.0
 #define DEFAULT_DIRECTION RECEIVE
 #define DEFAULT_PORT "2000"
 

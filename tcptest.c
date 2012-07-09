@@ -80,7 +80,7 @@ void craft_response(char *user, char *password, unsigned char *challenge, unsign
 
 int open_socket(char *host, char *port){
 	struct addrinfo hints, *servinfo, *p;
-	int rv, sockfd;
+	int rv, sockfd=-1;
 
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = AF_UNSPEC;
@@ -107,7 +107,8 @@ int open_socket(char *host, char *port){
 
 	if (p == NULL) {
 		fprintf(stderr, "failed to connect\n");
-		close(sockfd);
+		if (sockfd != -1)
+			close(sockfd);
 		return RETURN_ERROR;
 	}
 	return sockfd;
@@ -115,7 +116,7 @@ int open_socket(char *host, char *port){
 
 int init_test(int sockfd, char *user, char *password,  direction_t direction, int mtu){
 	unsigned char *buffer, challenge[CHALLENGE_SIZE], response[RESPONSE_SIZE];
-	int numbytes, rv;
+	int numbytes, rv=0;
 
 	buffer = (unsigned char *) malloc(mtu);
 

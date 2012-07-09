@@ -51,7 +51,7 @@ void print_help(){
 }
 
 int parse_opt(int *argc, char **argv, program_options_t *options){
-	int c, optarglen, option_index;
+	int c, optarglen=0, option_index;
 	char * pch;
 
 	static struct option long_options[] = {

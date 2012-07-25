@@ -16,19 +16,41 @@
 #include <getopt.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <sys/types.h>
 
 #include "direction.h"
 #include "return_codes.h"
 #include "parse_opt.h"
 
-void trunccopy(char *dst, int dstmaxlen, char *orig, int origlen){
-	if (origlen < dstmaxlen)
-		strcpy(dst, orig);
-	else{
-		strncpy(dst, orig, dstmaxlen-1);
-		dst[dstmaxlen-1] = '\0';
-	}	
+/*
+ * Copy src to string dst of size siz.  At most siz-1 characters
+ * will be copied.  Always NUL terminates (unless siz == 0).
+ * Returns strlen(src); if retval >= siz, truncation occurred.
+ */
+size_t strlcpy(char *dst, const char *src, size_t size) {
+	char *d = dst;
+	const char *s = src;
+	size_t n = size;
+
+	/* Copy as many bytes as will fit */
+	if (n != 0 && --n != 0) {
+		do {
+			if ((*d++ = *s++) == 0)
+				break;
+		} while (--n != 0);
+	}
+
+	/* Not enough room in dst, add NUL and traverse rest of src */
+	if (n == 0) {
+		if (size != 0)
+			*d = '\0';		/* NUL-terminate dst */
+		while (*s++)
+			;
+	}
+
+	return(s - src - 1);	/* count does not include NUL */
 }
+
 
 void set_default_opt(program_options_t *options){
 	memset(options, 0, sizeof(*options));
@@ -51,7 +73,7 @@ void print_help(){
 }
 
 int parse_opt(int *argc, char **argv, program_options_t *options){
-	int c, optarglen=0, option_index;
+	int c, option_index;
 	char * pch;
 
 	static struct option long_options[] = {
@@ -66,8 +88,6 @@ int parse_opt(int *argc, char **argv, program_options_t *options){
 	set_default_opt(options);
 
 	while ((c = getopt_long(*argc, argv, "p:t:m:d:u:a:h", long_options, &option_index)) != -1) {
-		if (optarg)
-			optarglen = strlen(optarg);
 		switch(c){
 			case 't':
 				options->time = atoi(optarg);
@@ -76,13 +96,13 @@ int parse_opt(int *argc, char **argv, program_options_t *options){
 				options->mtu = atoi(optarg);
 				break;
 			case 'd':
-				trunccopy(options->direction_string, sizeof(options->direction_string), optarg, optarglen);
+				strlcpy(options->direction_string, optarg, sizeof(options->direction_string));
 				break;
 			case 'u':
-				trunccopy(options->user, sizeof(options->user), optarg, optarglen);
+				strlcpy(options->user, optarg, sizeof(options->user));
 				break;
 			case 'p':
-				trunccopy(options->password, sizeof(options->password), optarg, optarglen);
+				strlcpy(options->password, optarg, sizeof(options->password));
 				break;
 			case 'h':
 				print_help();
@@ -94,9 +114,9 @@ int parse_opt(int *argc, char **argv, program_options_t *options){
 	}
 	if (*argc - optind == 1){
 		if ((pch = strtok(argv[optind], ":")) != NULL){
-			trunccopy(options->host, sizeof(options->host), pch, strlen(pch));
+			strlcpy(options->host, pch, sizeof(options->host));
 			if((pch = strtok(NULL, ":")) != NULL)
-				trunccopy(options->port, sizeof(options->port), pch, strlen(pch));
+				strlcpy(options->port, pch, sizeof(options->port));
 		}
 		else
 			return RETURN_ERROR;
@@ -135,12 +155,12 @@ int check_opt(program_options_t *options){
 		fprintf(stderr, "MTU is not valid\n");
 		return RETURN_ERROR;
 	}
-	else if(options->mtu > 9000){
+	else if(options->mtu > MAX_MTU){
 		fprintf(stderr, "MTU is too big\n");
 		return RETURN_ERROR;
 	}
 
-	if (options->time == 0.0){
+	if (options->time == 0){
 		fprintf(stderr, "Time is not valid\n");
 		return RETURN_ERROR;
 	}

@@ -25,11 +25,9 @@ struct thread_args {
 	int32_t sockfd;
 	pthread_mutex_t *mutex;
 	uint32_t bytes;
-	double time;
 	uint16_t bufsize;
 	direction_t direction;
 	uint8_t stop;
-	double mbps;
 };
 typedef struct thread_args thread_args_t;
 

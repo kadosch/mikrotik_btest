@@ -1,7 +1,7 @@
 CC ?= gcc
 CFLAGS ?= -W -Wall -s -Os -ffunction-sections -fdata-sections
 LDFLAGS ?= -s -Wl,--gc-sections
-LDLIBS += -lpthread
+LDLIBS += -lpthread -lrt
 
 all: mikrotik_btest
 	

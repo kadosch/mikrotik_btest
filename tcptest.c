@@ -16,6 +16,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <time.h>
 #include <unistd.h>
 #include <netdb.h>
 #include <sys/socket.h>
@@ -169,11 +170,12 @@ int16_t init_test(int32_t sockfd, char *user, char *password,  direction_t direc
 
 int16_t tcptest(char *host, char *port, char *user, char *password, direction_t direction, uint16_t mtu, uint16_t time){
 	int32_t sockfd;
-	uint16_t elapsed_seconds = 0;
-	double mbps;
+	double Mbits, bits, asleep_time, max_time = time, elapsed_time = 0;
+	struct timespec t0, t1;
 	pthread_t threads[2];
 	thread_args_t threads_arg[2];
 	pthread_mutex_t mutexes[2];
+	uint32_t total_bytes[2];
 	pthread_attr_t attr;
 
 	if ((sockfd = open_socket(host, port)) == RETURN_ERROR)
@@ -191,35 +193,50 @@ int16_t tcptest(char *host, char *port, char *user, char *password, direction_t 
 
 	if (direction == BOTH){
 		init_thread_args(&threads_arg[RECEIVE], sockfd, &mutexes[RECEIVE], mtu, RECEIVE);
+		total_bytes[RECEIVE] = 0;
 		pthread_create(&threads[RECEIVE], &attr, tcptest_thread, (void *) &threads_arg[RECEIVE]);
 		init_thread_args(&threads_arg[SEND], sockfd, &mutexes[SEND], mtu, SEND);
+		total_bytes[SEND] = 0;
 		pthread_create(&threads[SEND], &attr, tcptest_thread, (void *) &threads_arg[SEND]);
 	}
 	else{
 		init_thread_args(&threads_arg[direction], sockfd, &mutexes[direction], mtu, direction);
+		total_bytes[direction] = 0;
 		pthread_create(&threads[direction], NULL, tcptest_thread, (void *) &threads_arg[direction]);
 	}
 
 	do{
+		clock_gettime(CLOCK_MONOTONIC, &t0);
 		sleep(1);
-		elapsed_seconds += 1;
+		clock_gettime(CLOCK_MONOTONIC, &t1);
+		asleep_time = ((double) (t1.tv_sec - t0.tv_sec)) + (((double) (t1.tv_nsec - t0.tv_nsec)) * 1.0e-9);
+
 		if (direction == RECEIVE || direction == BOTH){
 			pthread_mutex_lock(&mutexes[RECEIVE]);
-			mbps = threads_arg[RECEIVE].mbps;
+			total_bytes[RECEIVE] += threads_arg[RECEIVE].bytes;
+			bits = threads_arg[RECEIVE].bytes * 8.0;
+			Mbits = bits / 1048576.0;
+			threads_arg[RECEIVE].bytes = 0;
 			pthread_mutex_unlock(&mutexes[RECEIVE]);
-			printf("Rx: %7.2f Mb/s", mbps);
+			printf("Rx: %7.2f Mb/s", Mbits / asleep_time);
 		}
-		if (direction == BOTH)
+		if (direction == BOTH){
 			printf("\t");
+		}
 		if (direction == SEND || direction == BOTH){
 			pthread_mutex_lock(&mutexes[SEND]);
-			mbps = threads_arg[SEND].mbps;
+			total_bytes[SEND] += threads_arg[SEND].bytes;
+			bits = threads_arg[SEND].bytes * 8.0;
+			Mbits = bits / 1048576.0;
+			threads_arg[SEND].bytes = 0;
 			pthread_mutex_unlock(&mutexes[SEND]);
-			printf("Tx: %7.2f Mb/s", mbps);
+			printf("Tx: %7.2f Mb/s", Mbits / asleep_time);
 		}
 		printf("\r");
 		fflush(stdout);
-	}while (elapsed_seconds <= time);
+		clock_gettime(CLOCK_MONOTONIC, &t1);
+		elapsed_time += ((double) (t1.tv_sec - t0.tv_sec)) + (((double) (t1.tv_nsec - t0.tv_nsec)) * 1.0e-9);
+	}while (elapsed_time <= max_time);
 
 	pthread_mutex_lock(&mutexes[RECEIVE]);
 	threads_arg[RECEIVE].stop = 1;
@@ -231,13 +248,17 @@ int16_t tcptest(char *host, char *port, char *user, char *password, direction_t 
 
 	if (direction == RECEIVE || direction == BOTH){
 		pthread_join(threads[RECEIVE], NULL);
-		printf("Rx: %7.2f Mb/s", threads_arg[RECEIVE].mbps);
+		bits = total_bytes[RECEIVE] * 8.0;
+		Mbits = bits / 1048576.0;
+		printf("Rx: %7.2f Mb/s", Mbits / elapsed_time);
 	}
 	if (direction == BOTH)
-			printf("\t");
+		printf("\t");
 	if (direction == SEND || direction == BOTH){
 		pthread_join(threads[SEND], NULL);
-		printf("Tx: %7.2f Mb/s", threads_arg[SEND].mbps);
+		bits = total_bytes[SEND] * 8.0;
+		Mbits = bits / 1048576.0;
+		printf("Tx: %7.2f Mb/s", Mbits / elapsed_time);
 	}
 	printf("\n");
 

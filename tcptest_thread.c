@@ -16,7 +16,6 @@
 #include <string.h>
 #include <pthread.h>
 #include <sys/socket.h>
-#include <sys/time.h>
 #include <stdint.h>
 
 #include "tcptest_thread.h"
@@ -27,37 +26,29 @@ void init_thread_args(thread_args_t *args, int32_t sockfd, pthread_mutex_t *mute
 	args->direction = direction;
 	args->mutex = mutex;
 	args->bytes = 0;
-	args->time = 0.0;
 	args->stop = 0;
-	args->mbps = 0.0;
 }
 
 
 void *tcptest_thread(void *argument){
 	thread_args_t *args;
 	uint8_t *buffer;
-	struct timeval t0 , t1;
-	double tv_sec , tv_usec ;
 	int32_t bytes = 0;
 	uint16_t failed = 0;
 
 	args = (thread_args_t *) argument;
 
-	buffer = (unsigned char *) malloc(args->bufsize);
+	buffer = (uint8_t *) malloc(args->bufsize);
 	memset(buffer, 0, args->bufsize);
 
 	pthread_mutex_lock (args->mutex);
 	while (!args->stop && failed < MAX_RETRY){
 		pthread_mutex_unlock (args->mutex);
 		if (args->direction == RECEIVE){
-			gettimeofday(&t0 , NULL);
 			bytes = recv(args->sockfd, buffer, args->bufsize, 0);
-			gettimeofday(&t1 , NULL);
 		}
 		else{
-			gettimeofday(&t0 , NULL);
 			bytes = send(args->sockfd, buffer, args->bufsize, 0);
-			gettimeofday(&t1 , NULL);
 
 		}
 
@@ -68,12 +59,8 @@ void *tcptest_thread(void *argument){
 		else
 			failed = 0;
 
-		tv_sec = (double) (t1.tv_sec - t0.tv_sec);
-		tv_usec = (double) (t1.tv_usec - t0.tv_usec);
 		pthread_mutex_lock (args->mutex);
-		args->time += tv_sec + tv_usec * 1.0e-6;
 		args->bytes += bytes;
-		args->mbps = ((args->bytes * 8) / 1048576) / args->time;
 	}
 	free(buffer);
 	return NULL;

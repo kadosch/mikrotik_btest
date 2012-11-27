@@ -15,8 +15,10 @@
 #ifndef TCPTEST_H
 #define TCPTEST_H
 
+#include <stdint.h>
+
 #include "direction.h"
 
-int tcptest(char *host, char *port, char *user, char *password, direction_t direction, int mtu, int time);
+int16_t tcptest(char *host, char *port, char *user, char *password, direction_t direction, uint16_t mtu, uint16_t time);
 
 #endif

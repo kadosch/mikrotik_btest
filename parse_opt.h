@@ -15,13 +15,15 @@
 #ifndef PARSE_OPT_H
 #define PARSE_OPT_H
 
+#include <stdint.h>
+
 #include "direction.h"
 
 struct program_options {
 	char host[256];
 	char port[16];
-	int time;
-	int mtu;
+	uint16_t time;
+	uint16_t mtu;
 	char direction_string[8];
 	direction_t direction;
 	char user[32];

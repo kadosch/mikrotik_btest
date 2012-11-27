@@ -15,6 +15,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <pthread.h>
+#include <stdint.h>
 
 #include "parse_opt.h"
 #include "tcptest.h"
@@ -22,7 +23,7 @@
 
 int main (int argc, char **argv) {
 	program_options_t options;
-	int rv;
+	int16_t rv;
 
 	rv = parse_opt(&argc, argv, &options);
 	if ( rv == RETURN_ERROR){

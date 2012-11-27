@@ -15,26 +15,25 @@
 #ifndef TCPTEST_THREAD_H
 #define TCPTEST_THREAD_H
 
-#include "direction.h"
+#include <stdint.h>
 
-#define TRUE 1
-#define FALSE 0
+#include "direction.h"
 
 #define MAX_RETRY 60
 
 struct thread_args {
-	int sockfd;
+	int32_t sockfd;
 	pthread_mutex_t *mutex;
-	unsigned long bytes;
+	uint32_t bytes;
 	double time;
-	int bufsize;
+	uint16_t bufsize;
 	direction_t direction;
-	int stop;
+	uint8_t stop;
 	double mbps;
 };
 typedef struct thread_args thread_args_t;
 
-void init_thread_args(thread_args_t *args, int sockfd, pthread_mutex_t *mutex, int bufsize, direction_t direction);
+void init_thread_args(thread_args_t *args, int32_t sockfd, pthread_mutex_t *mutex, uint16_t bufsize, direction_t direction);
 
 void *tcptest_thread(void *argument);
 

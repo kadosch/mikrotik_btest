@@ -17,27 +17,29 @@
 #include <pthread.h>
 #include <sys/socket.h>
 #include <sys/time.h>
+#include <stdint.h>
 
 #include "tcptest_thread.h"
 
-void init_thread_args(thread_args_t *args, int sockfd, pthread_mutex_t *mutex, int bufsize, direction_t direction){
+void init_thread_args(thread_args_t *args, int32_t sockfd, pthread_mutex_t *mutex, uint16_t bufsize, direction_t direction){
 	args->sockfd = sockfd;
 	args->bufsize = bufsize;
 	args->direction = direction;
 	args->mutex = mutex;
 	args->bytes = 0;
 	args->time = 0.0;
-	args->stop = FALSE;
+	args->stop = 0;
 	args->mbps = 0.0;
 }
 
 
 void *tcptest_thread(void *argument){
 	thread_args_t *args;
-	unsigned char *buffer;
+	uint8_t *buffer;
 	struct timeval t0 , t1;
 	double tv_sec , tv_usec ;
-	int bytes = 0, failed = 0;
+	int32_t bytes = 0;
+	uint16_t failed = 0;
 
 	args = (thread_args_t *) argument;
 

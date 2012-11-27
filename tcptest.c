@@ -19,6 +19,7 @@
 #include <unistd.h>
 #include <netdb.h>
 #include <sys/socket.h>
+#include <stdint.h>
 
 #include "tcptest.h"
 #include "tcptest_thread.h"
@@ -27,7 +28,7 @@
 #include "md5.h"
 #include "return_codes.h"
 
-int recv_msg(int sockfd, unsigned char *buf, int bufsize, unsigned char *msg, int *recvbytes){
+int16_t recv_msg(int32_t sockfd, unsigned char *buf, uint16_t bufsize, uint8_t *msg, int32_t *recvbytes){
 	if ((*recvbytes = recv(sockfd, buf, bufsize, 0)) == -1) {
 		perror("recv");
 		return RETURN_ERROR;
@@ -38,7 +39,7 @@ int recv_msg(int sockfd, unsigned char *buf, int bufsize, unsigned char *msg, in
 	return RETURN_MSG_MISMATCH;
 }
 
-int send_msg(int sockfd, unsigned char *msg, int len){
+int16_t send_msg(int32_t sockfd, uint8_t *msg, uint16_t len){
 	int bytes_sent = 0, failed = 0, bytes;
 	
 	do{
@@ -57,10 +58,10 @@ int send_msg(int sockfd, unsigned char *msg, int len){
 	return RETURN_OK;
 }
 
-void craft_response(char *user, char *password, unsigned char *challenge, unsigned char *response){
+void craft_response(char *user, char *password, uint8_t *challenge, uint8_t *response){
 	md5_state_t lvl1_state, lvl2_state;
 	md5_byte_t lvl1_digest[16], lvl2_digest[16];
-	int len = strlen(password);
+	uint32_t len = strlen(password);
 
 	md5_init(&lvl2_state);
 	if (len > 0)
@@ -78,9 +79,9 @@ void craft_response(char *user, char *password, unsigned char *challenge, unsign
 	strncpy((char *) response+sizeof(lvl1_digest), user, RESPONSE_SIZE-sizeof(lvl1_digest));
 }
 
-int open_socket(char *host, char *port){
+int16_t open_socket(char *host, char *port){
 	struct addrinfo hints, *servinfo, *p;
-	int rv, sockfd=-1;
+	int32_t rv, sockfd=-1;
 
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = AF_UNSPEC;
@@ -114,11 +115,11 @@ int open_socket(char *host, char *port){
 	return sockfd;
 }
 
-int init_test(int sockfd, char *user, char *password,  direction_t direction, int mtu){
-	unsigned char *buffer, challenge[CHALLENGE_SIZE], response[RESPONSE_SIZE];
-	int numbytes, rv=0;
+int16_t init_test(int32_t sockfd, char *user, char *password,  direction_t direction, uint16_t mtu){
+	uint8_t *buffer, challenge[CHALLENGE_SIZE], response[RESPONSE_SIZE];
+	int32_t numbytes, rv=0;
 
-	buffer = (unsigned char *) malloc(mtu);
+	buffer = (uint8_t *) malloc(mtu);
 
 	if (recv_msg(sockfd, buffer, mtu, MSG_OK, &numbytes) != 0){
 		close(sockfd);
@@ -166,8 +167,9 @@ int init_test(int sockfd, char *user, char *password,  direction_t direction, in
 	return RETURN_ERROR;
 }
 
-int tcptest(char *host, char *port, char *user, char *password, direction_t direction, int mtu, int time){
-	int sockfd, elapsed_seconds = 0;
+int16_t tcptest(char *host, char *port, char *user, char *password, direction_t direction, uint16_t mtu, uint16_t time){
+	int32_t sockfd;
+	uint16_t elapsed_seconds = 0;
 	double mbps;
 	pthread_t threads[2];
 	thread_args_t threads_arg[2];
@@ -220,11 +222,11 @@ int tcptest(char *host, char *port, char *user, char *password, direction_t dire
 	}while (elapsed_seconds <= time);
 
 	pthread_mutex_lock(&mutexes[RECEIVE]);
-	threads_arg[RECEIVE].stop = TRUE;
+	threads_arg[RECEIVE].stop = 1;
 	pthread_mutex_unlock(&mutexes[RECEIVE]);
 
 	pthread_mutex_lock(&mutexes[SEND]);
-	threads_arg[SEND].stop = TRUE;
+	threads_arg[SEND].stop = 1;
 	pthread_mutex_unlock(&mutexes[SEND]);
 
 	if (direction == RECEIVE || direction == BOTH){

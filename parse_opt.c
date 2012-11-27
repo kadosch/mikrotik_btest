@@ -17,6 +17,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <sys/types.h>
+#include <stdint.h>
 
 #include "direction.h"
 #include "return_codes.h"
@@ -73,7 +74,7 @@ void print_help(){
 }
 
 int parse_opt(int *argc, char **argv, program_options_t *options){
-	int c, option_index;
+	int32_t c, option_index;
 	char * pch;
 
 	static struct option long_options[] = {
@@ -127,7 +128,7 @@ int parse_opt(int *argc, char **argv, program_options_t *options){
 }
 
 int check_opt(program_options_t *options){
-	int port;
+	int32_t port;
 
 	port = atoi(options->port);
 	if (port < 1 || port >= 65536){

@@ -15,14 +15,16 @@
 #ifndef MESSAGES_H
 #define MESSAGES_H
 
-extern unsigned char MSG_OK[4];
-extern unsigned char MSG_NOOK[4];
+#include <stdint.h>
 
-extern unsigned char MSG_TCP_DOWN[16];
-extern unsigned char MSG_TCP_UP[16];
-extern unsigned char MSG_TCP_BOTH[16];
+extern uint8_t MSG_OK[4];
+extern uint8_t MSG_NOOK[4];
 
-extern unsigned char CHALLENGE_HEADER[4];
+extern uint8_t MSG_TCP_DOWN[16];
+extern uint8_t MSG_TCP_UP[16];
+extern uint8_t MSG_TCP_BOTH[16];
+
+extern uint8_t CHALLENGE_HEADER[4];
 
 #define CHALLENGE_TOTAL_SIZE 20
 #define CHALLENGE_SIZE 16

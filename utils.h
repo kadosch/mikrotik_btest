@@ -12,30 +12,19 @@
 * You should have received a copy of the GNU General Public License
 * along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
-#ifndef TCPTEST_THREAD_H
-#define TCPTEST_THREAD_H
+#ifndef UTILS_H
+#define UTILS_H
 
 #include <stdint.h>
 
 #include "direction.h"
 
-#define POLL_TIMEOUT 900
+#define MAX_RETRY 60
 
-struct thread_args {
-	pthread_mutex_t *mutex;
-	uint64_t bytes;
-	uint16_t bufsize;
-	direction_t direction;
-	uint8_t alive;
-	char *host;
-	char *port;
-	char *user;
-	char *password;
-};
-typedef struct thread_args thread_args_t;
-
-void init_thread_args(thread_args_t *args, pthread_mutex_t *mutex, uint16_t bufsize, direction_t direction, char *host, char *port, char *user, char *password);
-
-void *tcptest_thread(void *argument);
+int16_t init_test(int32_t sockfd, char *user, char *password,  direction_t direction, uint16_t mtu);
+int16_t open_socket(char *host, char *port);
+void craft_response(char *user, char *password, uint8_t *challenge, uint8_t *response);
+int16_t recv_msg(int32_t sockfd, unsigned char *buf, uint16_t bufsize, uint8_t *msg, int32_t *recvbytes);
+int16_t send_msg(int32_t sockfd, uint8_t *msg, uint16_t len);
 
 #endif
